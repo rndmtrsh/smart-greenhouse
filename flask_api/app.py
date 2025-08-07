@@ -1,7 +1,11 @@
-# flask_api/app.py
-from flask_api import create_app
+from flask import Flask
+from routes import bp  # perbaiki import path sesuai folder
 
-app = create_app()
+def create_app():
+    app = Flask(__name__)
+    app.register_blueprint(bp)  # Pastikan blueprint didaftarkan
+    return app
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+if __name__ == "__main__":
+    app = create_app()
+    app.run(host="0.0.0.0", port=5000)
