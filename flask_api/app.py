@@ -1,9 +1,9 @@
 from flask import Flask
-from routes import bp  # perbaiki import path sesuai folder
+from routes import bp
 
 def create_app():
     app = Flask(__name__)
-    app.register_blueprint(bp)  # Pastikan blueprint didaftarkan
+    app.register_blueprint(bp)
     return app
 
 if __name__ == "__main__":

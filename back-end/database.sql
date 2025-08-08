@@ -1,6 +1,6 @@
 -- 1. Tabel tanaman
 CREATE TABLE plants (
-    plant_id SERIAL PRIMARY KEY,
+    plant_id SERIAL PRIMARY KEY, 
     name VARCHAR(50) NOT NULL,
     media_type VARCHAR(20) NOT NULL CHECK (media_type IN ('Tanah', 'Hidroponik')),
     description TEXT
@@ -41,7 +41,6 @@ CREATE TABLE device_sensors (
     sensor_id INT NOT NULL,
     sensor_label VARCHAR(50),
     sensor_order INT NOT NULL CHECK (sensor_order >= 1),
-    installed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (device_id) REFERENCES devices(device_id) ON DELETE CASCADE,
     FOREIGN KEY (sensor_id) REFERENCES sensors(sensor_id) ON DELETE CASCADE,
     UNIQUE (device_id, sensor_order)
