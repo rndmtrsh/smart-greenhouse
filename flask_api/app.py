@@ -1,4 +1,3 @@
-# flask_api/app.py
 from flask import Flask
 from flask_cors import CORS
 import logging
