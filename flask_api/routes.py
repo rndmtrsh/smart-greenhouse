@@ -34,6 +34,20 @@ def ping():
     """Health check endpoint"""
     return jsonify({"message": "AMAN COK", "status": "healthy"}), 200
 
+# Add /health route (without /api prefix) for tunnel health checks
+@bp.route("/health", methods=["GET"])
+def health():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT 1")
+        cur.close()
+        conn.close()
+        return jsonify({"status": "healthy", "database": "connected", "tunnel": "active"}), 200
+    except Exception as e:
+        return jsonify({"status": "unhealthy", "error": str(e)}), 500
+
+
 @bp.route("/api/zones", methods=["GET"])
 @require_api_key
 @handle_db_error
