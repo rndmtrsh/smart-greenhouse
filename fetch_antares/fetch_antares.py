@@ -68,9 +68,9 @@ def run_middleware():
         for device_name in device_names:
             logging.info(f"Memproses {app_name}/{device_name}")
             data = get_latest_data(app_name, device_name)
-            time.sleep(2)
             if data:
                 save_to_database(data)
+                time.sleep(3)
 
 # Execution
 if __name__ == "__main__":
