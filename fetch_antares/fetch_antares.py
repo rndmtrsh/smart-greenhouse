@@ -7,71 +7,118 @@ import logging
 import time
 from config import HEADERS, APP_DEVICES, DB_CONFIG
 
-# Logging
+# Logging konfigurasi dasar
 logging.basicConfig(
     filename="middleware.log",
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s"
 )
 
-# Fetch data from Antares
-def get_latest_data(app_name, device_name, retries=3, delay=2):
-    try:
-        url = f"https://platform.antares.id:8443/~/antares-cse/antares-id/{app_name}/{device_name}/la"
-        response = requests.get(url, headers=HEADERS, timeout=10)
+# Session untuk koneksi HTTP reuse
+session = requests.Session()
+session.headers.update(HEADERS)
 
-        if response.status_code == 200:
-            raw = response.json()["m2m:cin"]["con"]
-            parsed = json.loads(raw)
-            return {
-                "dev_eui": parsed.get("devEui"),
-                "encoded_data": parsed.get("data"),
-                "timestamp": datetime.now()
-            }
-        else:
-            logging.warning(f"Gagal request [{device_name}] code {response.status_code}")
-    except Exception as e:
-        logging.error(f"Exception [{device_name}]: {e}")
+def get_latest_data(app_name, device_name, retries=3, delay=5):
+    """
+    Ambil data terakhir dari Antares dengan retry
+    """
+    url = f"https://platform.antares.id:8443/~/antares-cse/antares-id/{app_name}/{device_name}/la"
+    
+    for attempt in range(retries):
+        try:
+            timeout = 30 + (attempt * 10)
+            response = session.get(url, timeout=timeout)
+
+            if response.status_code == 200:
+                raw = response.json()["m2m:cin"]["con"]
+                parsed = json.loads(raw)
+                return {
+                    "dev_eui": parsed.get("devEui"),
+                    "encoded_data": parsed.get("data"),
+                    "timestamp": datetime.now()
+                }
+            else:
+                logging.error(f"{app_name}/{device_name} - HTTP {response.status_code} (attempt {attempt+1})")
+                
+        except requests.exceptions.Timeout:
+            logging.error(f"{app_name}/{device_name} - Timeout (attempt {attempt+1})")
+        except requests.exceptions.ConnectionError as e:
+            logging.error(f"{app_name}/{device_name} - Connection error: {str(e)[:100]}")
+        except requests.exceptions.SSLError as e:
+            logging.error(f"{app_name}/{device_name} - SSL error: {str(e)[:100]}")
+        except Exception as e:
+            logging.error(f"{app_name}/{device_name} - Unexpected error: {e}")
+        
+        if attempt < retries - 1:
+            time.sleep(delay * (2 ** attempt))
+    
+    logging.error(f"{app_name}/{device_name} - Gagal ambil data setelah {retries} percobaan")
     return None
 
-# Save to PostgreSQL
-def save_to_database(payload):
-    conn = None
-    try:
-        conn = psycopg2.connect(**DB_CONFIG)
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+def save_to_database(payload, app_name, device_name, retries=3):
+    """
+    Simpan data ke database dengan retry
+    """
+    for attempt in range(retries):
+        conn = None
+        try:
+            conn = psycopg2.connect(**DB_CONFIG)
+            cur = conn.cursor(cursor_factory=RealDictCursor)
 
-        cur.execute("SELECT device_id FROM devices WHERE dev_eui = %s", (payload['dev_eui'],))
-        result = cur.fetchone()
+            cur.execute("SELECT device_id FROM devices WHERE dev_eui = %s", (payload['dev_eui'],))
+            result = cur.fetchone()
 
-        if result:
-            device_id = result["device_id"]
-            cur.execute("""
-                INSERT INTO sensor_readings (device_id, encoded_data, timestamp)
-                VALUES (%s, %s, %s)
-            """, (device_id, payload['encoded_data'], payload['timestamp']))
-            conn.commit()
-            logging.info(f"Data tersimpan: devEUI={payload['dev_eui']}")
-        else:
-            logging.warning(f"devEUI tidak dikenali: {payload['dev_eui']}")
+            if result:
+                device_id = result["device_id"]
+                cur.execute("""
+                    INSERT INTO sensor_readings (device_id, encoded_data, timestamp)
+                    VALUES (%s, %s, %s)
+                """, (device_id, payload['encoded_data'], payload['timestamp']))
+                conn.commit()
+                cur.close()
+                return True
+            else:
+                logging.error(f"{app_name}/{device_name} - devEUI tidak ditemukan: {payload['dev_eui']}")
+                cur.close()
+                return False
 
-        cur.close()
-    except Exception as e:
-        logging.error(f"DB Error: {e}")
-    finally:
-        if conn:
-            conn.close()
+        except psycopg2.OperationalError as e:
+            logging.error(f"{app_name}/{device_name} - DB connection error: {e}")
+            time.sleep(2 * (attempt + 1))
+        except Exception as e:
+            logging.error(f"{app_name}/{device_name} - DB Error: {e}")
+            break
+        finally:
+            if conn:
+                conn.close()
+    
+    logging.error(f"{app_name}/{device_name} - Gagal simpan data ke DB setelah {retries} percobaan")
+    return False
 
-# Main Loop
 def run_middleware():
+    """
+    Proses utama
+    """
+    total_devices = sum(len(devices) for devices in APP_DEVICES.values())
+    successful = 0
+    
+    logging.info(f"Memulai middleware - total {total_devices} device")
+    
     for app_name, device_names in APP_DEVICES.items():
         for device_name in device_names:
-            logging.info(f"Memproses {app_name}/{device_name}")
             data = get_latest_data(app_name, device_name)
-            if data:
-                save_to_database(data)
-                time.sleep(3)
+            if data and save_to_database(data, app_name, device_name):
+                successful += 1
+            time.sleep(3)
+    
+    logging.info(f"Selesai - {successful}/{total_devices} berhasil")
 
-# Execution
 if __name__ == "__main__":
-    run_middleware()
+    try:
+        run_middleware()
+    except KeyboardInterrupt:
+        logging.info("Middleware dihentikan oleh user")
+    except Exception as e:
+        logging.critical(f"Critical error: {e}")
+    finally:
+        session.close()
