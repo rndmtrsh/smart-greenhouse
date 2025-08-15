@@ -7,35 +7,36 @@ from config import Config
 
 bp = Blueprint("api", __name__)
 
+# Middleware Decorators
 def require_api_key(f):
-    """Decorator for API key authentication"""
+    """API key authentication decorator"""
     @wraps(f)
-    def decorated_function(*args, **kwargs):
-        client_api_key = request.headers.get("X-API-KEY")
-        if client_api_key != Config.API_KEY:
-            logging.warning(f"Unauthorized access attempt from {request.remote_addr}")
-            return jsonify({"error": "Unauthorized"}), 401
+    def decorated(*args, **kwargs):
+        if request.endpoint not in ("api.ping", "api.health"):
+            client_key = request.headers.get("X-API-KEY")
+            if client_key != Config.API_KEY:
+                logging.warning(f"Unauthorized access attempt from {request.remote_addr}")
+                return jsonify({"status": "error", "message": "Unauthorized"}), 401
         return f(*args, **kwargs)
-    return decorated_function
+    return decorated
 
 def handle_db_error(f):
-    """Decorator for database error handling"""
+    """Database error handler"""
     @wraps(f)
-    def decorated_function(*args, **kwargs):
+    def decorated(*args, **kwargs):
         try:
             return f(*args, **kwargs)
         except Exception as e:
-            logging.error(f"Database error in {f.__name__}: {str(e)}")
-            return jsonify({"error": "Internal server error"}), 500
-    return decorated_function
+            logging.error(f"DB error in {f.__name__}: {str(e)}")
+            return jsonify({"status": "error", "message": "Internal server error"}), 500
+    return decorated
 
+# Health Check
 @bp.route("/api/ping")
 def ping():
-    """Health check endpoint"""
-    return jsonify({"message": "AMAN COK", "status": "healthy"}), 200
+    return jsonify({"status": "healthy", "message": "AMAN"}), 200
 
-# Add /health route (without /api prefix) for tunnel health checks
-@bp.route("/health", methods=["GET"])
+@bp.route("/health")
 def health():
     try:
         conn = get_db_connection()
@@ -47,98 +48,105 @@ def health():
     except Exception as e:
         return jsonify({"status": "unhealthy", "error": str(e)}), 500
 
-
-@bp.route("/api/zones", methods=["GET"])
+# Latest Readings (All Devices)
+@bp.route("/api/latest-readings", methods=["GET"])
 @require_api_key
 @handle_db_error
-def get_zones():
-    """Get all zones with their plant information"""
+def latest_readings():
     conn = get_db_connection()
-    try:
-        cur = conn.cursor()
-        
-        query = """
-            SELECT 
-                z.zone_id,
-                z.zone_code,
-                z.zone_label,
-                z.location_description,
-                p.name as plant_name,
-                p.media_type,
-                p.description as plant_description
-            FROM zones z
-            LEFT JOIN plants p ON z.plant_id = p.plant_id
-            ORDER BY z.zone_code;
-        """
-        
-        cur.execute(query)
-        results = cur.fetchall()
-        
-        return jsonify({
-            "zones": results,
-            "count": len(results)
-        }), 200
-        
-    finally:
-        conn.close()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT DISTINCT ON (d.device_id)
+            sr.reading_id,
+            z.zone_code,
+            sr.encoded_data,
+            sr.timestamp
+        FROM sensor_readings sr
+        JOIN devices d ON sr.device_id = d.device_id
+        JOIN zones z ON d.zone_id = z.zone_id
+        ORDER BY d.device_id, sr.timestamp DESC;
+    """)
+    data = cur.fetchall()
+    conn.close()
 
-@bp.route("/api/zones/<zone_code>", methods=["GET"])
+    return jsonify({
+        "status": "success",
+        "count": len(data),
+        "readings": data
+    }), 200
+
+# Latest Reading (Single Device)
+@bp.route("/api/latest-readings/<device_code>", methods=["GET"])
 @require_api_key
 @handle_db_error
-def get_zone_details(zone_code):
-    """Get specific zone details with devices"""
+def latest_reading_device(device_code):
     conn = get_db_connection()
-    try:
-        cur = conn.cursor()
-        
-        # Get zone information
-        zone_query = """
-            SELECT 
-                z.zone_id,
-                z.zone_code,
-                z.zone_label,
-                z.location_description,
-                p.name as plant_name,
-                p.media_type,
-                p.description as plant_description
-            FROM zones z
-            LEFT JOIN plants p ON z.plant_id = p.plant_id
-            WHERE z.zone_code = %s;
-        """
-        
-        cur.execute(zone_query, (zone_code,))
-        zone_info = cur.fetchone()
-        
-        if not zone_info:
-            return jsonify({"error": "Zone not found"}), 404
-        
-        # Get devices in this zone
-        devices_query = """
-            SELECT 
-                d.device_id,
-                d.dev_eui,
-                d.code,
-                d.description
-            FROM devices d
-            WHERE d.zone_id = %s;
-        """
-        
-        cur.execute(devices_query, (zone_info['zone_id'],))
-        devices = cur.fetchall()
-        
-        return jsonify({
-            "zone": zone_info,
-            "devices": devices
-        }), 200
-        
-    finally:
-        conn.close()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT sr.encoded_data, sr.timestamp
+        FROM sensor_readings sr
+        JOIN devices d ON sr.device_id = d.device_id
+        WHERE d.code = %s
+        ORDER BY sr.timestamp DESC
+        LIMIT 1;
+    """, (device_code,))
+    row = cur.fetchone()
+    conn.close()
 
+    if not row:
+        return jsonify({"status": "error", "message": "Device not found"}), 404
+
+    return jsonify({"status": "success", "device_code": device_code, "reading": row}), 200
+
+# 24-Hour Interval (4 Hours Step)
+@bp.route("/api/<device_code>/24", methods=["GET"])
+@require_api_key
+@handle_db_error
+def readings_24h(device_code):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT sr.encoded_data, sr.timestamp
+        FROM sensor_readings sr
+        JOIN devices d ON sr.device_id = d.device_id
+        WHERE d.code = %s
+          AND sr.timestamp >= NOW() - INTERVAL '24 HOURS'
+        ORDER BY date_trunc('hour', sr.timestamp)::timestamp / INTERVAL '4 HOURS', sr.timestamp DESC;
+    """, (device_code,))
+    data = cur.fetchall()
+    conn.close()
+
+    return jsonify({"status": "success", "device_code": device_code, "interval": "4h", "readings": data}), 200
+
+# 7-Day Average (Daily)
+@bp.route("/api/<device_code>/7", methods=["GET"])
+@require_api_key
+@handle_db_error
+def readings_7d(device_code):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT 
+            to_char(date_trunc('day', sr.timestamp), 'YYYY-MM-DD') AS day,
+            AVG((sr.encoded_data)::numeric) AS avg_encoded,
+            MIN(sr.timestamp) AS sample_time
+        FROM sensor_readings sr
+        JOIN devices d ON sr.device_id = d.device_id
+        WHERE d.code = %s
+          AND sr.timestamp >= NOW() - INTERVAL '7 DAYS'
+        GROUP BY date_trunc('day', sr.timestamp)
+        ORDER BY day DESC;
+    """, (device_code,))
+    data = cur.fetchall()
+    conn.close()
+
+    return jsonify({"status": "success", "device_code": device_code, "interval": "1d", "readings": data}), 200
+
+# Get all devices with their zone information
 @bp.route("/api/devices", methods=["GET"])
 @require_api_key
 @handle_db_error
 def get_devices():
-    """Get all devices with their zone information"""
     conn = get_db_connection()
     try:
         cur = conn.cursor()
@@ -169,11 +177,11 @@ def get_devices():
     finally:
         conn.close()
 
+#Get sensors for a specific device
 @bp.route("/api/devices/<device_code>/sensors", methods=["GET"])
 @require_api_key
 @handle_db_error
 def get_device_sensors(device_code):
-    """Get sensors for a specific device"""
     conn = get_db_connection()
     try:
         cur = conn.cursor()
@@ -202,103 +210,6 @@ def get_device_sensors(device_code):
         return jsonify({
             "device_code": device_code,
             "sensors": results
-        }), 200
-        
-    finally:
-        conn.close()
-
-@bp.route("/api/latest-readings", methods=["GET"])
-@require_api_key
-@handle_db_error
-def get_latest_readings():
-    """Get latest sensor readings for all devices"""
-    conn = get_db_connection()
-    try:
-        cur = conn.cursor()
-
-        query = """
-            SELECT DISTINCT ON (d.device_id)
-                sr.reading_id,
-                d.code AS device_code,
-                d.dev_eui,
-                z.zone_code,
-                z.zone_label,
-                p.name as plant_name,
-                sr.encoded_data,
-                sr.timestamp
-            FROM sensor_readings sr
-            JOIN devices d ON sr.device_id = d.device_id
-            JOIN zones z ON d.zone_id = z.zone_id
-            LEFT JOIN plants p ON z.plant_id = p.plant_id
-            ORDER BY d.device_id, sr.timestamp DESC;
-        """
-
-        cur.execute(query)
-        results = cur.fetchall()
-
-        return jsonify({
-            "readings": results,
-            "count": len(results)
-        }), 200
-        
-    finally:
-        conn.close()
-
-@bp.route("/api/readings/<device_code>", methods=["GET"])
-@require_api_key
-@handle_db_error
-def get_device_readings(device_code):
-    """Get readings for a specific device with pagination"""
-    limit = request.args.get('limit', 50, type=int)
-    offset = request.args.get('offset', 0, type=int)
-    
-    # Validate pagination parameters
-    if limit > 1000:
-        limit = 1000
-    if limit < 1:
-        limit = 50
-    if offset < 0:
-        offset = 0
-    
-    conn = get_db_connection()
-    try:
-        cur = conn.cursor()
-        
-        query = """
-            SELECT 
-                sr.reading_id,
-                sr.encoded_data,
-                sr.timestamp
-            FROM sensor_readings sr
-            JOIN devices d ON sr.device_id = d.device_id
-            WHERE d.code = %s
-            ORDER BY sr.timestamp DESC
-            LIMIT %s OFFSET %s;
-        """
-        
-        cur.execute(query, (device_code, limit, offset))
-        results = cur.fetchall()
-        
-        # Get total count
-        count_query = """
-            SELECT COUNT(*)
-            FROM sensor_readings sr
-            JOIN devices d ON sr.device_id = d.device_id
-            WHERE d.code = %s;
-        """
-        
-        cur.execute(count_query, (device_code,))
-        total_count = cur.fetchone()['count']
-        
-        return jsonify({
-            "device_code": device_code,
-            "readings": results,
-            "pagination": {
-                "limit": limit,
-                "offset": offset,
-                "total": total_count,
-                "has_more": offset + len(results) < total_count
-            }
         }), 200
         
     finally:
