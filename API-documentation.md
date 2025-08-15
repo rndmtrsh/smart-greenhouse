@@ -44,7 +44,7 @@ https://kedairekagreenhouse.my.id
 
 ## 🔐 Autentikasi
 
-Semua endpoint API (kecuali `/health`) memerlukan **API Key Authentication**.
+Semua endpoint API (kecuali `/health` `/api/ping`) memerlukan **API Key Authentication**.
 
 ### 📝 Header yang Diperlukan
 ```
@@ -97,7 +97,7 @@ Memeriksa kesehatan sistem dan koneksi database.
 ---
 
 #### `GET /api/ping`
-> 🔒 **Requires API key**
+> ✅ **Public endpoint** - Tidak memerlukan API key
 
 Health check dengan autentikasi.
 
@@ -584,7 +584,7 @@ class GreenhouseAPI {
                 ec: parseInt(hexString.substr(8, 4), 16) / 100,
                 temperature: parseInt(hexString.substr(12, 4), 16) / 10
             };
-        }
+        } 
         
         if (deviceCode.startsWith('MZ') || deviceCode.startsWith('HZ')) {
             return {
