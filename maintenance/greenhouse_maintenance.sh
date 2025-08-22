@@ -197,3 +197,14 @@ case "${1:-auto}" in
         exit 1
         ;;
 esac
+
+# Memory usage check before maintenance
+check_memory_usage() {
+    available_mem=$(free -m | awk 'NR==2{printf "%.0f", $7}')
+    if [ "$available_mem" -lt 200 ]; then
+        log_message "WARNING: Low available memory ($available_mem MB)"
+        # Skip heavy operations if memory is low
+        return 1
+    fi
+    return 0
+}

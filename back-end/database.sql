@@ -9,19 +9,18 @@ CREATE TABLE plants (
 -- 2. Tabel zona
 CREATE TABLE zones (
     zone_id SERIAL PRIMARY KEY,
-    plant_id INT ,
+    plant_id INT,
     zone_code VARCHAR(10) UNIQUE NOT NULL,
     zone_label VARCHAR(50),
     location_description TEXT,
     FOREIGN KEY (plant_id) REFERENCES plants(plant_id) ON DELETE CASCADE
 );
 
--- 3. Tabel perangkat IoT
+-- 3. Tabel perangkat IoT (updated: removed dev_eui, code is now unique identifier)
 CREATE TABLE devices (
     device_id SERIAL PRIMARY KEY,
-    dev_eui VARCHAR(32) UNIQUE NOT NULL,
     zone_id INT NOT NULL,
-    code VARCHAR(50),
+    code VARCHAR(50) UNIQUE NOT NULL,
     description TEXT,
     FOREIGN KEY (zone_id) REFERENCES zones(zone_id) ON DELETE CASCADE
 );
@@ -51,7 +50,7 @@ CREATE TABLE sensor_readings (
     reading_id BIGSERIAL PRIMARY KEY,
     device_id INT NOT NULL,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    encoded_data CHAR(64) NOT NULL,
+    encoded_data VARCHAR(64) NOT NULL,
     FOREIGN KEY (device_id) REFERENCES devices(device_id) ON DELETE CASCADE
 );
 
@@ -65,3 +64,4 @@ CREATE TABLE users (
 -- 8. Indexing untuk efisiensi pencarian historis
 CREATE INDEX idx_readings_timestamp ON sensor_readings(timestamp);
 CREATE INDEX idx_readings_device ON sensor_readings(device_id);
+CREATE INDEX idx_devices_code ON devices(code);
