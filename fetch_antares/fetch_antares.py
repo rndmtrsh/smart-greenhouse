@@ -7,6 +7,7 @@ import logging
 import time
 from config import HEADERS, APP_DEVICES, DB_CONFIG
 
+
 # Logging konfigurasi dasar
 logging.basicConfig(
     filename="middleware.log",
@@ -19,9 +20,6 @@ session = requests.Session()
 session.headers.update(HEADERS)
 
 def get_latest_data(app_name, device_name, retries=3, delay=5):
-    """
-    Ambil data terakhir dari Antares dengan retry
-    """
     url = f"https://platform.antares.id:8443/~/antares-cse/antares-id/{app_name}/{device_name}/la"
     
     for attempt in range(retries):
@@ -32,8 +30,11 @@ def get_latest_data(app_name, device_name, retries=3, delay=5):
             if response.status_code == 200:
                 raw = response.json()["m2m:cin"]["con"]
                 parsed = json.loads(raw)
+                
+                # Data yang diterima hanya berisi encoded_data, tidak ada dev_eui
+                # device_name dari URL digunakan sebagai device_code
                 return {
-                    "dev_eui": parsed.get("devEui"),
+                    "device_code": device_name,  # menggunakan device_name sebagai device_code
                     "encoded_data": parsed.get("data"),
                     "timestamp": datetime.now()
                 }
@@ -56,16 +57,14 @@ def get_latest_data(app_name, device_name, retries=3, delay=5):
     return None
 
 def save_to_database(payload, app_name, device_name, retries=3):
-    """
-    Simpan data ke database dengan retry
-    """
     for attempt in range(retries):
         conn = None
         try:
             conn = psycopg2.connect(**DB_CONFIG)
             cur = conn.cursor(cursor_factory=RealDictCursor)
 
-            cur.execute("SELECT device_id FROM devices WHERE dev_eui = %s", (payload['dev_eui'],))
+            # Cari device berdasarkan code (device_name sama dengan device_code)
+            cur.execute("SELECT device_id FROM devices WHERE code = %s", (payload['device_code'],))
             result = cur.fetchone()
 
             if result:
@@ -76,9 +75,10 @@ def save_to_database(payload, app_name, device_name, retries=3):
                 """, (device_id, payload['encoded_data'], payload['timestamp']))
                 conn.commit()
                 cur.close()
+                logging.info(f"Data tersimpan: device_code={payload['device_code']}, data={payload['encoded_data']}")
                 return True
             else:
-                logging.error(f"{app_name}/{device_name} - devEUI tidak ditemukan: {payload['dev_eui']}")
+                logging.error(f"{app_name}/{device_name} - Device code tidak ditemukan di database: {payload['device_code']}")
                 cur.close()
                 return False
 
@@ -96,22 +96,23 @@ def save_to_database(payload, app_name, device_name, retries=3):
     return False
 
 def run_middleware():
-    """
-    Proses utama
-    """
-    total_devices = sum(len(devices) for devices in APP_DEVICES.values())
+    total_devices = sum(len(device_names) for device_names in APP_DEVICES.values())
     successful = 0
     
     logging.info(f"Memulai middleware - total {total_devices} device")
     
     for app_name, device_names in APP_DEVICES.items():
         for device_name in device_names:
+            logging.info(f"Memproses {app_name}/{device_name}")
             data = get_latest_data(app_name, device_name)
             if data and save_to_database(data, app_name, device_name):
                 successful += 1
-            time.sleep(3)
+                logging.info(f"Berhasil memproses {device_name}: {data['encoded_data']}")
+            else:
+                logging.warning(f"Gagal memproses {device_name}")
+            time.sleep(3)  # Delay antar request
     
-    logging.info(f"Selesai - {successful}/{total_devices} berhasil")
+    logging.info(f"Selesai - {successful}/{total_devices} berhasil diproses")
 
 if __name__ == "__main__":
     try:
