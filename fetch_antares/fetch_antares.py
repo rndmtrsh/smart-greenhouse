@@ -30,9 +30,6 @@ def get_latest_data(app_name, device_name, retries=3, delay=5):
             if response.status_code == 200:
                 raw = response.json()["m2m:cin"]["con"]
                 parsed = json.loads(raw)
-                
-                # Data yang diterima hanya berisi encoded_data, tidak ada dev_eui
-                # device_name dari URL digunakan sebagai device_code
                 return {
                     "device_code": device_name,  # menggunakan device_name sebagai device_code
                     "encoded_data": parsed.get("data"),
