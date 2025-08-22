@@ -84,7 +84,7 @@ BEGIN
 END$$;
 
 -- Selada (PH, EC, Temp) - updated to use SZ%
-DO $
+DO $$
 DECLARE
     dev RECORD;
     sid INT[];
@@ -96,10 +96,10 @@ BEGIN
             VALUES (dev.device_id, sid[i], 'Sensor ' || sid[i], i);
         END LOOP;
     END LOOP;
-END$;
+END$$;
 
 -- Greenhouse (Temp, Humidity, Light) - updated to include humidity sensor
-DO $
+DO $$
 DECLARE
     dev_id INT;
     temp_id INT;
@@ -114,7 +114,7 @@ BEGIN
         (dev_id, temp_id, 'Sensor Suhu Greenhouse', 1),
         (dev_id, humidity_id, 'Sensor Kelembapan Greenhouse', 2),
         (dev_id, light_id, 'Sensor Cahaya Greenhouse', 3);
-END$;
+END$$;
 
 -- Sample sensor readings (optional - for testing)
 -- HEX format: 4 characters per sensor reading
