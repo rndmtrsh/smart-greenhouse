@@ -18,7 +18,6 @@
 - [🔐 Autentikasi](#-autentikasi)
 - [📡 Endpoint API](#-endpoint-api)
   - [🏥 Health Check](#-health-check)
-  - [🗺️ Manajemen Zona](#️-manajemen-zona)
   - [📱 Manajemen Perangkat](#-manajemen-perangkat)
   - [📊 Data Sensor](#-data-sensor)
   - [🌿 Manajemen Tanaman](#-manajemen-tanaman)
@@ -44,7 +43,7 @@ https://kedairekagreenhouse.my.id
 
 ## 🔐 Autentikasi
 
-Semua endpoint API (kecuali `/health` `/api/ping`) memerlukan **API Key Authentication**.
+Semua endpoint API (kecuali `/health`) memerlukan **API Key Authentication**.
 
 ### 📝 Header yang Diperlukan
 ```
@@ -54,7 +53,7 @@ Content-Type: application/json
 
 ### ✅ Contoh Request
 ```bash
-curl -X GET "https://kedairekagreenhouse.my.id/api/zones" \
+curl -X GET "https://kedairekagreenhouse.my.id/api/devices" \
   -H "X-API-KEY: your_api_key_here" \
   -H "Content-Type: application/json"
 ```
@@ -62,7 +61,8 @@ curl -X GET "https://kedairekagreenhouse.my.id/api/zones" \
 ### ❌ Response Unauthorized
 ```json
 {
-  "error": "Unauthorized"
+  "status": "error",
+  "message": "Unauthorized"
 }
 ```
 
@@ -99,98 +99,13 @@ Memeriksa kesehatan sistem dan koneksi database.
 #### `GET /api/ping`
 > ✅ **Public endpoint** - Tidak memerlukan API key
 
-Health check dengan autentikasi.
+Health check sederhana.
 
 **✅ Response (200):**
 ```json
 {
-  "message": "AMAN COK",
-  "status": "healthy"
-}
-```
-
----
-
-### 🗺️ Manajemen Zona
-
-#### `GET /api/zones`
-> 🔒 **Requires API key**
-
-Mengambil daftar semua zona dengan informasi tanaman.
-
-**✅ Response (200):**
-```json
-{
-  "zones": [
-    {
-      "zone_id": 1,
-      "zone_code": "CZ1",
-      "zone_label": "Zona Cabai 1",
-      "location_description": "Baris 1",
-      "plant_name": "Cabai",
-      "media_type": "Tanah",
-      "plant_description": "Cabai media tanah polybag"
-    },
-    {
-      "zone_id": 7,
-      "zone_code": "MZ1",
-      "zone_label": "Zona Melon 1",
-      "location_description": "Rakit A1",
-      "plant_name": "Melon",
-      "media_type": "Hidroponik",
-      "plant_description": "Melon sistem hidroponik"
-    },
-    {
-      "zone_id": 14,
-      "zone_code": "GZ",
-      "zone_label": "Zona Greenhouse Umum",
-      "location_description": "3 titik deteksi",
-      "plant_name": null,
-      "media_type": null,
-      "plant_description": null
-    }
-  ],
-  "count": 14
-}
-```
-
----
-
-#### `GET /api/zones/{zone_code}`
-> 🔒 **Requires API key**
-
-Mengambil detail zona spesifik beserta perangkat yang ada.
-
-**Parameters:**
-- `zone_code` *(string)*: Kode zona (CZ1, CZ2, MZ1, HZ1, GZ, dll.)
-
-**✅ Success Response (200):**
-```json
-{
-  "zone": {
-    "zone_id": 1,
-    "zone_code": "CZ1",
-    "zone_label": "Zona Cabai 1",
-    "location_description": "Baris 1",
-    "plant_name": "Cabai",
-    "media_type": "Tanah",
-    "plant_description": "Cabai media tanah polybag"
-  },
-  "devices": [
-    {
-      "device_id": 1,
-      "dev_eui": "device_eui_here",
-      "code": "CZ1",
-      "description": "Device Cabai Zona 1"
-    }
-  ]
-}
-```
-
-**❌ Error Response (404):**
-```json
-{
-  "error": "Zone not found"
+  "status": "healthy",
+  "message": "AMAN"
 }
 ```
 
@@ -217,16 +132,34 @@ Mengambil daftar semua perangkat IoT beserta informasi zona dan tanaman.
       "plant_name": "Cabai"
     },
     {
-      "device_id": 7,
+      "device_id": 5,
       "dev_eui": "device_eui_here",
       "code": "MZ1",
       "description": "Device Melon Zona 1",
       "zone_code": "MZ1",
       "zone_label": "Zona Melon 1",
       "plant_name": "Melon"
+    },
+    {
+      "device_id": 7,
+      "dev_eui": "device_eui_here",
+      "code": "SZ12",
+      "description": "Device Selada Zona 1-2",
+      "zone_code": "SZ12",
+      "zone_label": "Zona Selada 1-2",
+      "plant_name": "Selada"
+    },
+    {
+      "device_id": 10,
+      "dev_eui": "device_eui_here",
+      "code": "GZ1",
+      "description": "Device Greenhouse",
+      "zone_code": "GZ1",
+      "zone_label": "Zona Greenhouse Umum",
+      "plant_name": null
     }
   ],
-  "count": 14
+  "count": 10
 }
 ```
 
@@ -238,7 +171,7 @@ Mengambil daftar semua perangkat IoT beserta informasi zona dan tanaman.
 Mengambil daftar sensor yang terpasang pada perangkat tertentu.
 
 **Parameters:**
-- `device_code` *(string)*: Kode perangkat (CZ1, CZ2, MZ1, HZ1, GZ1, dll.)
+- `device_code` *(string)*: Kode perangkat (CZ1-CZ4, MZ1-MZ2, SZ12/SZ3/SZ4, GZ1)
 
 **✅ Success Response (200):**
 ```json
@@ -288,11 +221,11 @@ Mengambil daftar sensor yang terpasang pada perangkat tertentu.
 }
 ```
 
-**💡 Sensor Configuration per Plant:**
-- **🌶️ Cabai (CZ1-CZ6)**: pH, Soil Moisture, EC, Temperature
-- **🍈 Melon (MZ1-MZ5)**: pH, EC, Temperature  
-- **🥬 Selada (HZ1-HZ2)**: pH, EC, Temperature
-- **🏠 Greenhouse (GZ1)**: Temperature, Light
+**💡 Device Configuration yang Tersedia:**
+- **🌶️ Cabai**: CZ1, CZ2, CZ3, CZ4 (pH, Soil Moisture, EC, Temperature)
+- **🍈 Melon**: MZ1, MZ2 (pH, EC, Temperature)  
+- **🥬 Selada**: SZ12, SZ3, SZ4 (pH, EC, Temperature)
+- **🏠 Greenhouse**: GZ1 (Temperature, Humidity, Light)
 
 ---
 
@@ -306,81 +239,123 @@ Mengambil pembacaan sensor terbaru untuk semua perangkat (satu reading terakhir 
 **✅ Response (200):**
 ```json
 {
+  "status": "success",
+  "count": 3,
   "readings": [
     {
       "reading_id": 1,
-      "device_code": "CZ1",
-      "dev_eui": "device_eui_here",
       "zone_code": "CZ1",
-      "zone_label": "Zona Cabai 1",
-      "plant_name": "Cabai",
       "encoded_data": "01F402BC006400C8",
       "timestamp": "2025-08-15T14:30:25.123456"
     },
     {
       "reading_id": 2,
-      "device_code": "GZ1",
-      "dev_eui": "device_eui_here",
-      "zone_code": "GZ",
-      "zone_label": "Zona Greenhouse Umum",
-      "plant_name": null,
-      "encoded_data": "00C8012C",
+      "zone_code": "MZ1",
+      "encoded_data": "01F4006400C8",
+      "timestamp": "2025-08-15T14:29:10.987654"
+    },
+    {
+      "reading_id": 3,
+      "zone_code": "GZ1",
+      "encoded_data": "00C801F4012C",
       "timestamp": "2025-08-15T14:28:45.567890"
     }
-  ],
-  "count": 3
+  ]
 }
 ```
 
 ---
 
-#### `GET /api/readings/{device_code}`
+#### `GET /api/latest-readings/{device_code}`
 > 🔒 **Requires API key**
 
-Mengambil riwayat pembacaan sensor untuk perangkat tertentu dengan dukungan pagination.
+Mengambil pembacaan sensor terbaru untuk perangkat tertentu.
 
 **Parameters:**
-- `device_code` *(string)*: Kode perangkat
-- `limit` *(integer, optional)*: Jumlah data per halaman (default: 50, max: 1000)
-- `offset` *(integer, optional)*: Offset data (default: 0)
-
-**Query Parameters:**
-```
-?limit=10&offset=0
-```
+- `device_code` *(string)*: Kode perangkat (CZ1-CZ4, MZ1-MZ2, SZ12/SZ3/SZ4, GZ1)
 
 **✅ Response (200):**
 ```json
 {
+  "status": "success",
   "device_code": "CZ1",
-  "readings": [
-    {
-      "reading_id": 105,
-      "encoded_data": "01F402BC006400C8",
-      "timestamp": "2025-08-15T14:30:25.123456"
-    },
-    {
-      "reading_id": 104,
-      "encoded_data": "01E802A0005A00B4",
-      "timestamp": "2025-08-15T14:25:15.234567"
-    }
-  ],
-  "pagination": {
-    "limit": 5,
-    "offset": 0,
-    "total": 1250,
-    "has_more": true
+  "reading": {
+    "encoded_data": "01F402BC006400C8",
+    "timestamp": "2025-08-15T14:30:25.123456"
   }
 }
 ```
 
-**🔄 Pagination Example:**
+**❌ Error Response (404):**
+```json
+{
+  "status": "error",
+  "message": "Device not found"
+}
 ```
-# Halaman pertama (0-49)
-GET /api/readings/CZ1?limit=50&offset=0
 
-# Halaman kedua (50-99)  
-GET /api/readings/CZ1?limit=50&offset=50
+---
+
+#### `GET /api/{device_code}/24`
+> 🔒 **Requires API key**
+
+Mengambil data sensor dalam 24 jam terakhir dengan interval 4 jam.
+
+**Parameters:**
+- `device_code` *(string)*: Kode perangkat
+
+**✅ Response (200):**
+```json
+{
+  "status": "success",
+  "device_code": "CZ1",
+  "interval": "4h",
+  "readings": [
+    {
+      "encoded_data": "01F402BC006400C8",
+      "timestamp": "2025-08-15T14:30:25.123456"
+    },
+    {
+      "encoded_data": "01E802A0005A00B4",
+      "timestamp": "2025-08-15T10:30:25.123456"
+    },
+    {
+      "encoded_data": "01DC029C005600B0",
+      "timestamp": "2025-08-15T06:30:25.123456"
+    }
+  ]
+}
+```
+
+---
+
+#### `GET /api/{device_code}/7`
+> 🔒 **Requires API key**
+
+Mengambil rata-rata data sensor dalam 7 hari terakhir per hari.
+
+**Parameters:**
+- `device_code` *(string)*: Kode perangkat
+
+**✅ Response (200):**
+```json
+{
+  "status": "success",
+  "device_code": "CZ1",
+  "interval": "1d",
+  "readings": [
+    {
+      "day": "2025-08-15",
+      "avg_encoded": 500.5,
+      "sample_time": "2025-08-15T08:00:00.000000"
+    },
+    {
+      "day": "2025-08-14",
+      "avg_encoded": 485.2,
+      "sample_time": "2025-08-14T08:00:00.000000"
+    }
+  ]
+}
 ```
 
 ---
@@ -401,21 +376,21 @@ Mengambil daftar semua jenis tanaman beserta jumlah zona yang dimiliki.
       "name": "Cabai",
       "media_type": "Tanah",
       "description": "Cabai media tanah polybag",
-      "zone_count": 6
+      "zone_count": 4
     },
     {
       "plant_id": 2,
       "name": "Melon",
       "media_type": "Hidroponik",
       "description": "Melon sistem hidroponik",
-      "zone_count": 5
+      "zone_count": 2
     },
     {
       "plant_id": 3,
       "name": "Selada",
       "media_type": "Hidroponik",
       "description": "Selada hidroponik NFT",
-      "zone_count": 2
+      "zone_count": 3
     }
   ],
   "count": 3
@@ -448,13 +423,6 @@ Mengambil daftar semua jenis tanaman beserta jumlah zona yang dimiliki.
 ```json
 {
   "error": "Unauthorized"
-}
-```
-
-**🔴 404 - Zone Not Found:**
-```json
-{
-  "error": "Zone not found"
 }
 ```
 
@@ -493,7 +461,7 @@ Mengambil daftar semua jenis tanaman beserta jumlah zona yang dimiliki.
 ### 📡 Encoded Data (HEX Format)
 Data sensor disimpan dalam format **HEX string** sesuai urutan sensor pada setiap perangkat.
 
-#### 🌶️ **Cabai Devices (CZ1-CZ6)** - 4 Sensor
+#### 🌶️ **Cabai Devices (CZ1-CZ4)** - 4 Sensor
 ```
 Encoded Data: "01F402BC006400C8" (16 characters HEX)
 
@@ -504,7 +472,7 @@ Breakdown:
 └── 00C8 → Temp      = 200 → 20.0°C
 ```
 
-#### 🍈 **Melon/Selada Devices** - 3 Sensor
+#### 🍈 **Melon Devices (MZ1-MZ2)** - 3 Sensor
 ```
 Encoded Data: "01F4006400C8" (12 characters HEX)
 
@@ -514,14 +482,36 @@ Breakdown:
 └── 00C8 → Temp  = 200 → 20.0°C
 ```
 
-#### 🏠 **Greenhouse Device (GZ1)** - 2 Sensor
+#### 🥬 **Selada Devices (SZ12, SZ3, SZ4)** - 3 Sensor
 ```
-Encoded Data: "00C8012C" (8 characters HEX)
+Encoded Data: "01C8004B00A0" (12 characters HEX)
 
 Breakdown:
-├── 00C8 → Temp  = 200 → 20.0°C
-└── 012C → Light = 300 → 300 lux
+├── 01C8 → pH    = 456 → 4.56 pH
+├── 004B → EC    = 75  → 0.75 mS/cm
+└── 00A0 → Temp  = 160 → 16.0°C
 ```
+
+#### 🏠 **Greenhouse Device (GZ1)** - 3 Sensor
+```
+Encoded Data: "00C801F4012C" (12 characters HEX)
+
+Breakdown:
+├── 00C8 → Temp     = 200 → 20.0°C
+├── 01F4 → Humidity = 500 → 50.0%
+└── 012C → Light    = 300 → 300 lux
+```
+
+### 🔧 **Mapping Antares ke Database**
+Beberapa device memiliki nama yang berbeda di platform Antares:
+
+| Database Code | Antares Name | Plant Type |
+|---------------|--------------|------------|
+| CZ1-CZ4 | CZ1-CZ4 | Cabai |
+| MZ1 | MZ1 | Melon |
+| MZ2 | M2 | Melon |
+| SZ12, SZ3, SZ4 | SZ12, SZ3, SZ4 | Selada |
+| GZ1 | GZ1 | Greenhouse |
 
 ---
 
@@ -563,30 +553,42 @@ class GreenhouseAPI {
     }
 
     // API Methods
-    async getZones() {
-        return this.request('/api/zones');
+    async getDevices() {
+        return this.request('/api/devices');
     }
 
     async getLatestReadings() {
         return this.request('/api/latest-readings');
     }
 
-    async getDeviceReadings(deviceCode, limit = 50, offset = 0) {
-        return this.request(`/api/readings/${deviceCode}?limit=${limit}&offset=${offset}`);
+    async getDeviceLatestReading(deviceCode) {
+        return this.request(`/api/latest-readings/${deviceCode}`);
+    }
+
+    async get24HourData(deviceCode) {
+        return this.request(`/api/${deviceCode}/24`);
+    }
+
+    async get7DayData(deviceCode) {
+        return this.request(`/api/${deviceCode}/7`);
+    }
+
+    async getPlants() {
+        return this.request('/api/plants');
     }
 
     // Decode HEX data
     decodeHexData(hexString, deviceCode) {
-        if (deviceCode.startsWith('CZ')) {  // Cabai
+        if (deviceCode.startsWith('CZ')) {  // Cabai (4 sensors)
             return {
                 pH: parseInt(hexString.substr(0, 4), 16) / 100,
                 moisture: parseInt(hexString.substr(4, 4), 16) / 10,
                 ec: parseInt(hexString.substr(8, 4), 16) / 100,
                 temperature: parseInt(hexString.substr(12, 4), 16) / 10
             };
-        } 
+        }
         
-        if (deviceCode.startsWith('MZ') || deviceCode.startsWith('HZ')) {
+        if (deviceCode.startsWith('MZ') || deviceCode.startsWith('SZ')) {  // Melon/Selada (3 sensors)
             return {
                 pH: parseInt(hexString.substr(0, 4), 16) / 100,
                 ec: parseInt(hexString.substr(4, 4), 16) / 100,
@@ -594,16 +596,37 @@ class GreenhouseAPI {
             };
         }
         
-        if (deviceCode.startsWith('GZ')) {  // Greenhouse
+        if (deviceCode.startsWith('GZ')) {  // Greenhouse (3 sensors)
             return {
                 temperature: parseInt(hexString.substr(0, 4), 16) / 10,
-                light: parseInt(hexString.substr(4, 4), 16)
+                humidity: parseInt(hexString.substr(4, 4), 16) / 10,
+                light: parseInt(hexString.substr(8, 4), 16)
             };
         }
         
         return null;
     }
 }
+
+// Usage Example
+const api = new GreenhouseAPI();
+
+// Get latest readings for all devices
+api.getLatestReadings()
+    .then(data => {
+        data.readings.forEach(reading => {
+            const decoded = api.decodeHexData(reading.encoded_data, reading.zone_code);
+            console.log(`${reading.zone_code}:`, decoded);
+        });
+    })
+    .catch(error => console.error('Error:', error));
+
+// Get 24-hour data for specific device
+api.get24HourData('CZ1')
+    .then(data => {
+        console.log('24-hour data for CZ1:', data.readings);
+    })
+    .catch(error => console.error('Error:', error));
 ```
 
 ### ⚛️ React Hook Example
@@ -613,28 +636,28 @@ import { useState, useEffect } from 'react';
 
 const useGreenhouseAPI = () => {
     const [data, setData] = useState({
-        zones: [],
         devices: [],
-        latestReadings: []
+        latestReadings: [],
+        plants: []
     });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    const api = new GreenhouseAPI('https://kedairekagreenhouse.my.id', 'your_api_key_here');
+    const api = new GreenhouseAPI();
 
     const fetchData = async () => {
         try {
             setLoading(true);
-            const [zones, devices, readings] = await Promise.all([
-                api.getZones(),
-                api.request('/api/devices'),
-                api.getLatestReadings()
+            const [devices, readings, plants] = await Promise.all([
+                api.getDevices(),
+                api.getLatestReadings(),
+                api.getPlants()
             ]);
 
             setData({
-                zones: zones.zones,
                 devices: devices.devices,
-                latestReadings: readings.readings
+                latestReadings: readings.readings,
+                plants: plants.plants
             });
         } catch (err) {
             setError(err.message);
@@ -681,24 +704,28 @@ class GreenhouseAPI:
         data = self._request('/api/latest-readings')
         return data['readings']
 
+    def get_device_24h_data(self, device_code: str) -> Dict:
+        return self._request(f'/api/{device_code}/24')
+
     def decode_hex_data(self, hex_string: str, device_code: str) -> Dict:
-        if device_code.startswith('CZ'):  # Cabai
+        if device_code.startswith('CZ'):  # Cabai (4 sensors)
             return {
                 'pH': int(hex_string[0:4], 16) / 100,
                 'moisture': int(hex_string[4:8], 16) / 10,
                 'ec': int(hex_string[8:12], 16) / 100,
                 'temperature': int(hex_string[12:16], 16) / 10
             }
-        elif device_code.startswith(('MZ', 'HZ')):  # Melon/Selada
+        elif device_code.startswith(('MZ', 'SZ')):  # Melon/Selada (3 sensors)
             return {
                 'pH': int(hex_string[0:4], 16) / 100,
                 'ec': int(hex_string[4:8], 16) / 100,
                 'temperature': int(hex_string[8:12], 16) / 10
             }
-        elif device_code.startswith('GZ'):  # Greenhouse
+        elif device_code.startswith('GZ'):  # Greenhouse (3 sensors)
             return {
                 'temperature': int(hex_string[0:4], 16) / 10,
-                'light': int(hex_string[4:8], 16)
+                'humidity': int(hex_string[4:8], 16) / 10,
+                'light': int(hex_string[8:12], 16)
             }
         else:
             return {'error': 'Unknown device type'}
@@ -708,7 +735,7 @@ api = GreenhouseAPI()
 readings = api.get_latest_readings()
 
 for reading in readings:
-    device = reading['device_code']
+    device = reading['zone_code']
     decoded = api.decode_hex_data(reading['encoded_data'], device)
     print(f"{device}: {decoded}")
 ```
