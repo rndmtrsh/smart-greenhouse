@@ -28,9 +28,7 @@ class WebhookDataHandler:
                 return False, "Could not parse webhook data"
             
             device_name, encoded_data, timestamp = parsed_data
-            
-            # Map device name (handle M2 -> MZ2)
-            device_code = WebhookConfig.get_device_code(device_name)
+            device_code = device_name
             
             # Basic validation
             if not WebhookConfig.validate_device(device_code):
