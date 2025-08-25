@@ -10,7 +10,7 @@ from config import HEADERS, APP_DEVICES, DB_CONFIG
 
 # Logging konfigurasi dasar
 logging.basicConfig(
-    filename="middleware.log",
+    filename="logs/middleware.log",
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s"
 )

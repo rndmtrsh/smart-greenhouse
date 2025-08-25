@@ -11,10 +11,10 @@ HEADERS = {
 }
 
 APP_DEVICES = {
-    "Tanaman_Cabe": ["CZ1", "CZ2", "CZ3", "CZ4"],
-    "Tanaman_Melon": ["MZ1", "M2"],
-    "Tanaman_Selada": ["SZ12", "SZ3", "SZ4"],
-    "Greenhouse": ["GZ1"]
+    # "CABAI": ["CZ1", "CZ2", "CZ3", "CZ4"],
+    # "MELON": ["MZ1", "MZ2"],
+    # "SELADA": ["SZ12", "SZ3", "SZ4"],
+    # "GREENHOUSE": ["GZ1"]
 }
 
 DB_CONFIG = {
