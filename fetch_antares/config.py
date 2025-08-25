@@ -12,9 +12,10 @@ HEADERS = {
 
 APP_DEVICES = {
     # "CABAI": ["CZ1", "CZ2", "CZ3", "CZ4"],
-    # "MELON": ["MZ1", "MZ2"],
+    # "MELON": ["MZ1", "MZ2"],  
     # "SELADA": ["SZ12", "SZ3", "SZ4"],
-    # "GREENHOUSE": ["GZ1"]
+    # "GREENHOUSE": ["GZ1"],
+    # "DRTPM-Hidroponik": ["Monitoring_Hidroponik"]
 }
 
 DB_CONFIG = {

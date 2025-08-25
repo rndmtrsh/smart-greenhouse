@@ -31,7 +31,7 @@ def get_latest_data(app_name, device_name, retries=3, delay=5):
                 raw = response.json()["m2m:cin"]["con"]
                 parsed = json.loads(raw)
                 return {
-                    "device_code": device_name,  # menggunakan device_name sebagai device_code
+                    "device_code": device_name,  
                     "encoded_data": parsed.get("data"),
                     "timestamp": datetime.now()
                 }
